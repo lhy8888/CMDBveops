@@ -41,7 +41,10 @@ services:
           - redis
 
   cmdb-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/cmdb-api:2.5.5
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile-API
+    image: lhy8888/cmdb-api:local
     container_name: cmdb-api
     env_file:
       - .env
@@ -68,11 +71,14 @@ services:
         celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=4,1 -D
         
         nohup flask cmdb-trigger > trigger.log 2>&1 &
-        flask cmdb-init-cache
         flask cmdb-init-acl
+        if flask --help | grep -q "cmdb-bootstrap-builtin-models"; then
+          flask cmdb-bootstrap-builtin-models --repair-existing
+        fi
+        flask cmdb-init-cache
         flask init-import-user-from-acl
         flask init-department
-        nohup flask cmdb-patch -v 2.4.17 &
+        nohup flask cmdb-patch -v 2.5.5 &
 
         celery -A celery_worker.celery worker --beat -E -Q beat_tasks --loglevel=info --autoscale=3,1 --max-tasks-per-child=10 > counter.log 2>&1
     networks:
@@ -86,7 +92,10 @@ services:
       test: "ps aux|grep -v grep|grep -v '1 root'|grep gunicorn || exit 1"
 
   cmdb-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/cmdb-ui:2.5.5
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile-UI
+    image: lhy8888/cmdb-ui:local
     container_name: cmdb-ui
     depends_on:
       cmdb-api:
