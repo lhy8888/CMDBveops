@@ -17,53 +17,61 @@ const service = axios.create({
   crossDomain: true,
 })
 
-const err = (error) => {
-  console.log(error)
-  const reg = /5\d{2}/g
-  const response = (error && error.response) || {}
-  const config = (error && error.config) || {}
-  const status = response.status
-  if (status && reg.test(String(status))) {
-    const errorMsg = (response.data || {}).message || i18n.t('requestServiceError')
-    message.error(errorMsg)
-  } else if (status === 412) {
-    let seconds = 5
-    notification.warning({
-      key: 'notification',
-      message: 'WARNING',
-      description: i18n.t('requestWait', {
-        time: 5,
-      }),
-      duration: 5,
-    })
-    let interval = setInterval(() => {
-      seconds -= 1
-      if (seconds === 0) {
-        clearInterval(interval)
-        interval = null
-        return
-      }
+const err = (error = {}) => {
+  try {
+    console.log(error)
+    const isServerError = (statusCode) => /^5\d{2}$/.test(String(statusCode || ''))
+    const response = (error && error.response && typeof error.response === 'object') ? error.response : {}
+    const config = (error && error.config && typeof error.config === 'object') ? error.config : {}
+    const status = Number(response.status || 0)
+
+    if (status && isServerError(status)) {
+      const errorMsg = (response.data || {}).message || i18n.t('requestServiceError')
+      message.error(errorMsg)
+    } else if (status === 412) {
+      let seconds = 5
       notification.warning({
         key: 'notification',
         message: 'WARNING',
         description: i18n.t('requestWait', {
-          time: seconds,
+          time: 5,
         }),
-        duration: seconds
+        duration: 5,
       })
-    }, 1000)
-  } else if (config.url === '/api/v0.1/ci_types/can_define_computed' || config.isShowMessage === false) {
-  } else {
-    const errorMsg = (response.data || {}).message || i18n.t('requestError')
-    message.error(`${errorMsg}`)
-  }
-  if (status) {
-    console.log(config.url)
-    const currentPath = (router.currentRoute || {}).path || router.path
-    if (status === 401 && currentPath === '/user/login') {
-      window.location.href = '/user/logout'
+      let interval = setInterval(() => {
+        seconds -= 1
+        if (seconds === 0) {
+          clearInterval(interval)
+          interval = null
+          return
+        }
+        notification.warning({
+          key: 'notification',
+          message: 'WARNING',
+          description: i18n.t('requestWait', {
+            time: seconds,
+          }),
+          duration: seconds
+        })
+      }, 1000)
+    } else if (config.url === '/api/v0.1/ci_types/can_define_computed' || config.isShowMessage === false) {
+    } else {
+      const errorMsg = (response.data || {}).message || i18n.t('requestError')
+      message.error(`${errorMsg}`)
     }
+
+    if (status) {
+      console.log(config.url)
+      const currentPath = (router.currentRoute || {}).path || router.path
+      if (status === 401 && currentPath === '/user/login') {
+        window.location.href = '/user/logout'
+      }
+    }
+  } catch (handlerError) {
+    console.error('axios error handler crashed:', handlerError)
+    message.error(i18n.t('requestError'))
   }
+
   return Promise.reject(error)
 }
 
